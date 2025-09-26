@@ -1,0 +1,30 @@
+{
+  "name": "rag-pdf-chat-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@langchain/community": "^0.3.56",
+    "@langchain/core": "^0.3.77",
+    "@langchain/google-genai": "^0.2.18",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "langchain": "^0.3.34",
+    "mongoose": "^8.18.2",
+    "multer": "^2.0.2",
+    "openai": "^5.23.0",
+    "path": "^0.12.7",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.16.3"
+  }
+}
