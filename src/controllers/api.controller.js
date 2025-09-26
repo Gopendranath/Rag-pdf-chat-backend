@@ -1,10 +1,11 @@
 // handleChat.js - Updated controller
 import { organizeFilesByType, cleanupFiles } from '../utils/file.utils.js';
 import { chatProcessStream, chatProcess } from '../lib/chatProcess.js';
+import { documentProcessStream, documentProcess } from '../lib/documentProcess.js';
 
 export const handleChat = async (req, res) => {
   try {
-    const { messages, stream = false } = req.body; // Add stream parameter
+    const { messages, stream = false, processDocuments = false } = req.body;
     const processedMessages = Array.isArray(messages) ? messages : [{ role: 'user', content: messages }];
     const organizedFiles = organizeFilesByType(req.files);
 
@@ -12,6 +13,9 @@ export const handleChat = async (req, res) => {
     const imagesCount = organizedFiles.images.length
     const othersCount = organizedFiles.others.length
     console.log(`filesCount: ${filesCount}, imagesCount: ${imagesCount}, othersCount: ${othersCount}`);
+
+    // Determine if we should process documents (you can modify this logic)
+    const shouldProcessDocuments = processDocuments || organizedFiles.documents.length > 0;
 
     if (stream) {
       // Handle streaming response
@@ -25,7 +29,7 @@ export const handleChat = async (req, res) => {
 
       try {
         // Send initial metadata
-        console.log("streaming starts")
+        console.log("streaming starts");
         res.write(`data: ${JSON.stringify({
           type: 'start',
           timestamp: new Date().toISOString(),
@@ -39,27 +43,53 @@ export const handleChat = async (req, res) => {
             images: organizedFiles.images.length,
             documents: organizedFiles.documents.length,
             others: organizedFiles.others.length
-          }
+          },
+          processDocuments: shouldProcessDocuments
         })}\n\n`);
 
-        // Stream the chat response
-        for await (const chunk of chatProcessStream(processedMessages)) {
-          fullResponse += chunk;
-          res.write(`data: ${JSON.stringify({
-            type: 'chunk',
-            content: chunk
-          })}\n\n`);
-        }
+        if (shouldProcessDocuments) {
+          // Use document processing with streaming
+          const lastMessage = processedMessages[processedMessages.length - 1].content;
+          
+          for await (const chunk of documentProcessStream(lastMessage)) {
+            const data = JSON.parse(chunk);
+            
+            // Send different types of events based on processing stage
+            res.write(`data: ${JSON.stringify({
+              type: 'document_processing',
+              ...data
+            })}\n\n`);
 
-        // Add the complete assistant message to processed messages
-        processedMessages.push({ role: 'assistant', content: fullResponse });
+            // Accumulate LLM response chunks
+            if (data.type === 'llm_chunk') {
+              fullResponse += data.content;
+            }
+          }
+
+          // Add the complete assistant message to processed messages
+          processedMessages.push({ role: 'assistant', content: fullResponse });
+
+        } else {
+          // Use regular chat processing with streaming
+          for await (const chunk of chatProcessStream(processedMessages)) {
+            fullResponse += chunk;
+            res.write(`data: ${JSON.stringify({
+              type: 'chunk',
+              content: chunk
+            })}\n\n`);
+          }
+
+          // Add the complete assistant message to processed messages
+          processedMessages.push({ role: 'assistant', content: fullResponse });
+        }
 
         // Send completion message
         res.write(`data: ${JSON.stringify({
           type: 'end',
           fullResponse,
           messages: processedMessages,
-          messageCount: processedMessages.length
+          messageCount: processedMessages.length,
+          processType: shouldProcessDocuments ? 'document_processing' : 'regular_chat'
         })}\n\n`);
 
         res.end();
@@ -75,8 +105,16 @@ export const handleChat = async (req, res) => {
       }
 
     } else {
-      // Handle regular non-streaming response (existing logic)
-      const response = await chatProcess(processedMessages);
+      // Handle regular non-streaming response
+      let response;
+      
+      if (shouldProcessDocuments) {
+        const lastMessage = processedMessages[processedMessages.length - 1].content;
+        response = await documentProcess(lastMessage);
+      } else {
+        response = await chatProcess(processedMessages);
+      }
+      
       processedMessages.push({ role: 'assistant', content: response });
 
       const responseData = {
@@ -95,7 +133,8 @@ export const handleChat = async (req, res) => {
           images: organizedFiles.images.length,
           documents: organizedFiles.documents.length,
           others: organizedFiles.others.length
-        }
+        },
+        processType: shouldProcessDocuments ? 'document_processing' : 'regular_chat'
       };
 
       res.status(200).json(responseData);
@@ -131,6 +170,7 @@ export const handleChat = async (req, res) => {
   }
 };
 
+// ... rest of the code remains the same
 export const getChatHistory = async (req, res) => {
   try {
 

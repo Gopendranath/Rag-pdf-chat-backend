@@ -2,20 +2,17 @@ import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { DirectoryLoader } from "langchain/document_loaders/fs/directory";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { OpenAI } from "openai";
-import dotenv from "dotenv";
+import "dotenv/config";
 import path from "path";
 import pkg from "pg";
 
-dotenv.config();
 const { Pool } = pkg;
 
 // -----------------------------
 // Step 0: Check API Key
 // -----------------------------
 if (!process.env.GEMINI_API_KEY) {
-    console.error("ERROR: GEMINI_API_KEY is not set in .env");
-    process.exit(1);
+    throw new Error("ERROR: GEMINI_API_KEY is not set in .env");
 }
 
 // -----------------------------
@@ -38,52 +35,88 @@ const embeddings = new GoogleGenerativeAIEmbeddings({
     modelName: "gemini-embedding-001",
 });
 
-const client = new OpenAI({
-    apiKey: process.env.GROQ_API_KEY,
-    baseURL: process.env.GROQ_API_URL,
-});
-
 // -----------------------------
 // Step 3: Define PDF Directory
 // -----------------------------
 const pdfPath = path.join(`${process.cwd()}/uploads/documents`);
 
 // -----------------------------
+// Utility: Logger with levels
+// -----------------------------
+const logger = {
+    info: (message, data = null) => {
+        console.log(`ℹ️  ${message}`, data ? JSON.stringify(data, null, 2) : '');
+    },
+    error: (message, error = null) => {
+        console.error(`❌ ${message}`, error ? error.message : '');
+    },
+    success: (message, data = null) => {
+        console.log(`✅ ${message}`, data ? JSON.stringify(data, null, 2) : '');
+    },
+    debug: (message, data = null) => {
+        if (process.env.DEBUG) {
+            console.debug(`🔍 ${message}`, data ? JSON.stringify(data, null, 2) : '');
+        }
+    }
+};
+
+// -----------------------------
 // Step 4: Load PDFs
 // -----------------------------
 const loadPDFs = async (dirPath) => {
-    const loader = new DirectoryLoader(dirPath, {
-        ".pdf": (p) => new PDFLoader(p),
-    });
-    const rawDocs = await loader.load();
-    console.log(`Loaded ${rawDocs.length} PDFs`);
-    return rawDocs;
+    try {
+        const loader = new DirectoryLoader(dirPath, {
+            ".pdf": (p) => new PDFLoader(p),
+        });
+        const rawDocs = await loader.load();
+        logger.info(`Loaded ${rawDocs.length} PDF documents`);
+        return rawDocs;
+    } catch (error) {
+        logger.error("Failed to load PDFs", error);
+        throw error;
+    }
 };
 
 // -----------------------------
 // Step 5: Split Documents
 // -----------------------------
 const splitDocuments = async (rawDocs) => {
-    const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 1000,
-        chunkOverlap: 200,
-    });
-    const splits = await splitter.splitDocuments(rawDocs);
-    console.log(`Split into ${splits.length} chunks`);
-    return splits;
+    try {
+        const splitter = new RecursiveCharacterTextSplitter({
+            chunkSize: 1000,
+            chunkOverlap: 200,
+        });
+        const splits = await splitter.splitDocuments(rawDocs);
+        logger.info(`Split documents into ${splits.length} chunks`);
+        return splits;
+    } catch (error) {
+        logger.error("Failed to split documents", error);
+        throw error;
+    }
 };
 
 // -----------------------------
 // Step 6: Embed Chunks
 // -----------------------------
 const embedChunks = async (chunks) => {
-    const texts = chunks.map((c) => c.pageContent);
-    const vectors = await embeddings.embedDocuments(texts);
-    return chunks.map((chunk, idx) => ({
-        content: chunk.pageContent.slice(0, 200), // save snippet
-        metadata: chunk.metadata || {}, // preserve metadata
-        vector: vectors[idx],
-    }));
+    try {
+        const texts = chunks.map((c) => c.pageContent);
+        logger.info(`Generating embeddings for ${texts.length} chunks`);
+        
+        const vectors = await embeddings.embedDocuments(texts);
+        
+        const embeddedChunks = chunks.map((chunk, idx) => ({
+            content: chunk.pageContent.slice(0, 200),
+            metadata: chunk.metadata || {},
+            vector: vectors[idx],
+        }));
+        
+        logger.success("Embeddings generated successfully");
+        return embeddedChunks;
+    } catch (error) {
+        logger.error("Failed to embed chunks", error);
+        throw error;
+    }
 };
 
 // -----------------------------
@@ -95,56 +128,68 @@ const formatVector = (vector) => `[${vector.join(",")}]`;
 // Step 8: Store in PostgreSQL
 // -----------------------------
 const storeVectors = async (embeddedChunks) => {
-    // Create table with 3072 dimensions and metadata column
-    await pool.query(`
-    CREATE TABLE IF NOT EXISTS pdf_vectors (
-      id SERIAL PRIMARY KEY,
-      content TEXT,
-      metadata JSONB,
-      embedding VECTOR(3072)
-    );
-  `);
+    try {
+        // Create table with 3072 dimensions and metadata column
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS pdf_vectors (
+                id SERIAL PRIMARY KEY,
+                content TEXT,
+                metadata JSONB,
+                embedding VECTOR(3072)
+            );
+        `);
 
-    for (const chunk of embeddedChunks) {
-        const vectorStr = formatVector(chunk.vector);
-        await pool.query(
-            "INSERT INTO pdf_vectors (content, metadata, embedding) VALUES ($1, $2, $3)",
-            [chunk.content, chunk.metadata, vectorStr]
-        );
+        logger.info(`Storing ${embeddedChunks.length} vectors in database`);
+
+        for (const chunk of embeddedChunks) {
+            const vectorStr = formatVector(chunk.vector);
+            await pool.query(
+                "INSERT INTO pdf_vectors (content, metadata, embedding) VALUES ($1, $2, $3)",
+                [chunk.content, chunk.metadata, vectorStr]
+            );
+        }
+
+        logger.success("All chunks stored in PostgreSQL vector table");
+    } catch (error) {
+        logger.error("Failed to store vectors in database", error);
+        throw error;
     }
-
-    console.log("✅ All chunks stored in PostgreSQL vector table");
 };
 
 // -----------------------------
-// Step 10: Retrieve similar documents
+// Step 9: Retrieve similar documents
 // -----------------------------
 const retrieveSimilar = async (queryText, topK = 2) => {
     try {
+        logger.info(`Searching for similar documents: "${queryText}"`, { topK });
+
         // Get embedding for query
         const queryVector = await embeddings.embedQuery(queryText);
         const vectorStr = formatVector(queryVector);
 
         // Query PostgreSQL for top-k similar vectors
         const res = await pool.query(
-            `
-      SELECT id, content, metadata, embedding <-> $1 AS distance
-      FROM pdf_vectors
-      ORDER BY distance
-      LIMIT $2
-      `,
+            `SELECT id, content, metadata, embedding <-> $1 AS distance
+             FROM pdf_vectors
+             ORDER BY distance
+             LIMIT $2`,
             [vectorStr, topK]
         );
 
-        console.log(`Top ${topK} similar chunks:`);
-        res.rows.forEach((row, idx) => {
-            console.log(`${idx + 1}.`, row.content, `(distance: ${row.distance})`);
-        });
+        logger.success(`Found ${res.rows.length} similar documents`);
+        
+        // Log distances for debugging
+        logger.debug("Search distances:", 
+            res.rows.map((row, idx) => `${idx + 1}. ${row.distance.toFixed(4)}`));
 
-        return res.rows.map((row) => row.content).join("\n\n");
+        return {
+            context: res.rows.map(row => row.content).join("\n\n"),
+            results: res.rows,
+            count: res.rows.length
+        };
     } catch (error) {
-        console.error("Error retrieving similar vectors:", error);
-        return [];
+        logger.error("Error retrieving similar vectors", error);
+        return { context: "", results: [], count: 0, error: error.message };
     }
 };
 
@@ -153,44 +198,95 @@ const retrieveSimilar = async (queryText, topK = 2) => {
 // -----------------------------
 const retrieveAllDocs = async () => {
     try {
-        const res = await pool.query("SELECT id, content, metadata FROM pdf_vectors ORDER BY id");
-        console.log(`Retrieved ${res.rows.length} chunks:`);
-        return res.rows.map((row) => row.content).join("\n\n");
+        logger.info("Retrieving all stored documents");
+        
+        const res = await pool.query(
+            "SELECT id, content, metadata FROM pdf_vectors ORDER BY id"
+        );
+
+        logger.success(`Retrieved ${res.rows.length} documents`);
+        
+        return {
+            documents: res.rows,
+            count: res.rows.length,
+            content: res.rows.map(row => row.content).join("\n\n")
+        };
     } catch (error) {
-        console.error("Error retrieving documents:", error);
-        return [];
+        logger.error("Error retrieving documents", error);
+        return { documents: [], count: 0, content: "", error: error.message };
     }
 };
 
 // -----------------------------
-// Clear all stored PDF vectors by dropping the table
+// Clear all stored PDF vectors
 // -----------------------------
 const clearAllData = async () => {
     try {
+        logger.info("Clearing all vector data");
+        
         await pool.query("TRUNCATE TABLE pdf_vectors");
-        console.log("✅ All data in pdf_vectors cleared successfully");
-        return "✅ All data in pdf_vectors cleared successfully";
+        
+        logger.success("All data cleared successfully");
+        return { 
+            success: true, 
+            message: "All data in pdf_vectors cleared successfully" 
+        };
     } catch (error) {
-        console.error("Error clearing data:", error);
-        return "Error clearing data";
+        logger.error("Error clearing data", error);
+        return { 
+            success: false, 
+            message: "Error clearing data", 
+            error: error.message 
+        };
     }
 };
 
+// -----------------------------
+// Create vectors and retrieve
+// -----------------------------
+const createThenRetrieve = async (query, topK = 3) => {
+    try {
+        logger.info("Starting create-then-retrieve pipeline", { query, topK });
 
-
-const createThenRetrive = async (query) => {
-    const docs = await loadPDFs(pdfPath);
-    const splits = await splitDocuments(docs);
-    const embeddedChunks = await embedChunks(splits);
-    await storeVectors(embeddedChunks);
-    const results = await retrieveSimilar(query, 3);
-    return results;
+        const docs = await loadPDFs(pdfPath);
+        const splits = await splitDocuments(docs);
+        const embeddedChunks = await embedChunks(splits);
+        await storeVectors(embeddedChunks);
+        
+        const results = await retrieveSimilar(query, topK);
+        
+        logger.success("Create-then-retrieve pipeline completed");
+        return results;
+    } catch (error) {
+        logger.error("Create-then-retrieve pipeline failed", error);
+        return { 
+            context: "", 
+            results: [], 
+            count: 0, 
+            error: error.message 
+        };
+    }
 };
 
+// -----------------------------
+// Health check function
+// -----------------------------
+const checkDatabaseHealth = async () => {
+    try {
+        const res = await pool.query("SELECT COUNT(*) as count FROM pdf_vectors");
+        const count = parseInt(res.rows[0].count);
+        logger.info("Database health check", { documentCount: count });
+        return { healthy: true, documentCount: count };
+    } catch (error) {
+        logger.error("Database health check failed", error);
+        return { healthy: false, error: error.message };
+    }
+};
 
 export const functionMap = {
     retrieveSimilar,
     retrieveAllDocs,
-    createThenRetrive,
-    clearAllData
+    createThenRetrieve,
+    clearAllData,
+    checkDatabaseHealth
 };
