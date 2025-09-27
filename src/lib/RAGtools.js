@@ -185,11 +185,18 @@ const retrieveSimilar = async (queryText, topK = 2) => {
         return {
             context: res.rows.map(row => row.content).join("\n\n"),
             results: res.rows,
-            count: res.rows.length
+            count: res.rows.length,
+            success: true
         };
     } catch (error) {
         logger.error("Error retrieving similar vectors", error);
-        return { context: "", results: [], count: 0, error: error.message };
+         return { 
+            context: "", 
+            results: [], 
+            count: 0, 
+            success: false,
+            error: error.message 
+        };
     }
 };
 

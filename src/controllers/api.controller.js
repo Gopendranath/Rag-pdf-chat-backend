@@ -4,18 +4,27 @@ import { chatProcessStream, chatProcess } from '../lib/chatProcess.js';
 import { documentProcessStream, documentProcess } from '../lib/documentProcess.js';
 
 export const handleChat = async (req, res) => {
+  // Initialize files cleanup array at the top
+  let filesToCleanup = [];
+  
   try {
     const { messages, stream = false, processDocuments = false } = req.body;
     const processedMessages = Array.isArray(messages) ? messages : [{ role: 'user', content: messages }];
     const organizedFiles = organizeFilesByType(req.files);
 
-    const filesCount = organizedFiles.documents.length
-    const imagesCount = organizedFiles.images.length
-    const othersCount = organizedFiles.others.length
-    console.log(`filesCount: ${filesCount}, imagesCount: ${imagesCount}, othersCount: ${othersCount}`);
+    const filesCount = organizedFiles.documents.length;
+    const imagesCount = organizedFiles.images.length;
+    const othersCount = organizedFiles.others.length;
 
-    // Determine if we should process documents (you can modify this logic)
+    // Determine if we should process documents
     const shouldProcessDocuments = processDocuments || organizedFiles.documents.length > 0;
+
+    // Collect files for cleanup
+    if (req.files) {
+      if (req.files.documents) filesToCleanup.push(...req.files.documents);
+      if (req.files.files) filesToCleanup.push(...req.files.files);
+      if (req.files.images) filesToCleanup.push(...req.files.images);
+    }
 
     if (stream) {
       // Handle streaming response
@@ -48,26 +57,37 @@ export const handleChat = async (req, res) => {
         })}\n\n`);
 
         if (shouldProcessDocuments) {
-          // Use document processing with streaming
           const lastMessage = processedMessages[processedMessages.length - 1].content;
-          
+          let finalResponse = '';
+
           for await (const chunk of documentProcessStream(lastMessage)) {
-            const data = JSON.parse(chunk);
+            const data = typeof chunk === 'string' ? JSON.parse(chunk) : chunk;
             
-            // Send different types of events based on processing stage
+            // Accumulate final response chunks
+            if (data.type === 'final_response_chunk') {
+              finalResponse += data.content;
+            }
+            
+            // Send the chunk to client
             res.write(`data: ${JSON.stringify({
               type: 'document_processing',
               ...data
             })}\n\n`);
 
-            // Accumulate LLM response chunks
-            if (data.type === 'llm_chunk') {
-              fullResponse += data.content;
+            // Store the final response when available
+            if (data.type === 'completion') {
+              finalResponse = data.final_response || finalResponse;
             }
           }
 
-          // Add the complete assistant message to processed messages
-          processedMessages.push({ role: 'assistant', content: fullResponse });
+          // Add the human-readable final response to messages
+          processedMessages.push({
+            role: 'assistant',
+            content: finalResponse || 'Document processing completed.'
+          });
+
+          // Update fullResponse for the end event
+          fullResponse = finalResponse;
 
         } else {
           // Use regular chat processing with streaming
@@ -86,13 +106,20 @@ export const handleChat = async (req, res) => {
         // Send completion message
         res.write(`data: ${JSON.stringify({
           type: 'end',
-          fullResponse,
+          fullResponse: fullResponse,
           messages: processedMessages,
           messageCount: processedMessages.length,
           processType: shouldProcessDocuments ? 'document_processing' : 'regular_chat'
         })}\n\n`);
 
         res.end();
+
+        console.log("streaming ends");
+        
+        // Cleanup files after successful streaming
+        if (filesToCleanup.length > 0) {
+          cleanupFiles(filesToCleanup);
+        }
 
       } catch (streamError) {
         console.error('Streaming error:', streamError);
@@ -102,19 +129,24 @@ export const handleChat = async (req, res) => {
           message: streamError.message
         })}\n\n`);
         res.end();
+        
+        // Cleanup files on streaming error
+        if (filesToCleanup.length > 0) {
+          cleanupFiles(filesToCleanup);
+        }
       }
 
     } else {
       // Handle regular non-streaming response
       let response;
-      
+
       if (shouldProcessDocuments) {
         const lastMessage = processedMessages[processedMessages.length - 1].content;
         response = await documentProcess(lastMessage);
       } else {
         response = await chatProcess(processedMessages);
       }
-      
+
       processedMessages.push({ role: 'assistant', content: response });
 
       const responseData = {
@@ -138,22 +170,29 @@ export const handleChat = async (req, res) => {
       };
 
       res.status(200).json(responseData);
+
+      // Cleanup files after successful non-streaming response
+      if (filesToCleanup.length > 0) {
+        cleanupFiles(filesToCleanup);
+      }
     }
 
   } catch (error) {
     console.error('Error in handleChat:', error);
 
     // Clean up any uploaded files in case of error
-    if (req.files) {
-      const allFiles = [];
-      if (req.files.images) allFiles.push(...req.files.images);
-      if (req.files.documents) allFiles.push(...req.files.documents);
-      if (req.files.files) allFiles.push(...req.files.files);
-      cleanupFiles(allFiles);
+    if (filesToCleanup.length > 0) {
+      cleanupFiles(filesToCleanup);
     }
 
-    if (req.body.stream) {
+    if (req.body && req.body.stream) {
       // Send error in streaming format
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+      }
+      
       res.write(`data: ${JSON.stringify({
         type: 'error',
         error: 'Failed to process chat request',
@@ -170,10 +209,8 @@ export const handleChat = async (req, res) => {
   }
 };
 
-// ... rest of the code remains the same
 export const getChatHistory = async (req, res) => {
   try {
-
     res.status(200).json({
       success: true,
       message: 'Chat history endpoint',
@@ -192,8 +229,6 @@ export const deleteChat = async (req, res) => {
   try {
     const { chatId } = req.params;
 
-    // This is a placeholder for chat deletion functionality
-    // You can implement database deletion later
     res.status(200).json({
       success: true,
       message: `Chat ${chatId} deleted successfully`
