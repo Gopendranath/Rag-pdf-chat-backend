@@ -33,7 +33,7 @@ export async function* documentProcessStream(query) {
     // Initialize context with the user's query inserted into the prompt
     const promptWithQuery = {
         ...systemPrompt,
-        content: systemPrompt.content.replace('"${query}"', `"${query}"`)
+        content: systemPrompt.content.replace('"{query}"', `"${query}"`)
     };
     
     let context = [promptWithQuery];
