@@ -1,4 +1,4 @@
-// handleChat.js - Updated controller
+// api.controller.js - Updated controller
 import { organizeFilesByType, cleanupFiles } from '../utils/file.utils.js';
 import { chatProcessStream, chatProcess } from '../lib/chatProcess.js';
 import { documentProcessStream, documentProcess } from '../lib/documentProcess.js';
