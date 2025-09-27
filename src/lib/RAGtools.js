@@ -106,7 +106,7 @@ const embedChunks = async (chunks) => {
         const vectors = await embeddings.embedDocuments(texts);
         
         const embeddedChunks = chunks.map((chunk, idx) => ({
-            content: chunk.pageContent.slice(0, 200),
+            content: chunk.pageContent,
             metadata: chunk.metadata || {},
             vector: vectors[idx],
         }));

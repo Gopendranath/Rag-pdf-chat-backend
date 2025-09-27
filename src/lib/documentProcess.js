@@ -69,7 +69,7 @@ export async function* documentProcessStream(query) {
                 model: "openai/gpt-oss-120b",
                 messages: context,
                 stream: true,
-                temperature: 0.5
+                temperature: 0.1
             });
 
             // Stream the LLM's thinking process
@@ -96,6 +96,7 @@ export async function* documentProcessStream(query) {
             if (parsed.type === 'functionCall') {
                 // Handle function call
                 const { function: fnName, args, status } = parsed.response;
+                console.log(`Executing function: ${fnName}`);
                 
                 if (!functionMap[fnName]) {
                     throw new Error(`Unknown function: ${fnName}. Available functions: ${Object.keys(functionMap).join(', ')}`);
@@ -138,7 +139,7 @@ export async function* documentProcessStream(query) {
                     content: rawResponse 
                 });
                 
-                let userFeedback = `Function ${fnName} executed successfully. `;
+                let userFeedback = `Function ${fnName} executed `;
                 if (result.context && result.context.length > 0) {
                     userFeedback += `Found ${result.count || 'some'} relevant documents. `;
                 } else {
