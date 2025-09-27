@@ -27,7 +27,7 @@ AVAILABLE FUNCTIONS:
 WORKFLOW RULES:
 1. Use "type": "functionCall" when you need to call a function
 2. Use "type": "finalResponse" when you have the final answer for the user
-3. For "what are the docs about?" queries:
+3. For "what are the docs about?" or "summarize the documents" or "what is this about?" types of similar queries:
    - First call retrieveAllDocs() to see what documents exist
    - If documents exist, call retrieveSimilar("summarize the main topics", topK=5)
    - If no documents exist, call createThenRetrieve("summarize the documents", topK=5)

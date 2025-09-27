@@ -69,8 +69,7 @@ export async function* documentProcessStream(query) {
                 model: "openai/gpt-oss-120b",
                 messages: context,
                 stream: true,
-                temperature: 0.1,
-                max_tokens: 500
+                temperature: 0.5
             });
 
             // Stream the LLM's thinking process

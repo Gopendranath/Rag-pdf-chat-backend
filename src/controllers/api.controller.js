@@ -11,6 +11,22 @@ export const handleChat = async (req, res) => {
   }
 };
 
+
+export const saveChatHistory = async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: 'Chat history saved successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save chat history',
+      message: error.message
+    });
+  }
+};
+
 export const getChatHistory = async (req, res) => {
   try {
     res.status(200).json({

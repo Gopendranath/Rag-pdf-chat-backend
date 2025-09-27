@@ -87,7 +87,6 @@ export async function* imageProcessStream(messages) {
         const stream = await imageClient.chat.completions.create({
             model: "pixtral-12b-2409",
             messages: enhancedMessages,
-            max_tokens: 4000,
             temperature: 0.7,
             stream: true,
         });
@@ -119,7 +118,6 @@ export async function imageProcess(messages) {
         const response = await imageClient.chat.completions.create({
             model: "pixtral-12b-2409",
             messages: enhancedMessages,
-            max_tokens: 4000,
             temperature: 0.7,
         });
 
