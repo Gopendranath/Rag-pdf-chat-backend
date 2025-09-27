@@ -15,7 +15,7 @@ const systemPrompt = {
     }
     OR
     // If type is "finalResponse":
-    "response": "Your final answer to the user here"
+    "response": "Your final answer in markdown format to the user here"
 }
 
 AVAILABLE FUNCTIONS:
