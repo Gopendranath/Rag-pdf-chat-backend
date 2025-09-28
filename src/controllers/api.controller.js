@@ -128,3 +128,41 @@ export const deleteChat = async (req, res) => {
     });
   }
 };
+
+
+export const getChatbyID = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    
+    if (!chatId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request',
+        message: 'Chat ID is required'
+      });
+    }
+    
+    const conversation = await Conversation.findOne({ conversationId: chatId });
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Conversation not found',
+        message: `No conversation found with ID: ${chatId}`
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Chat history retrieved successfully',
+      data: conversation
+    });
+  } catch (error) {
+    console.error('Error retrieving chat history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve chat history',
+      message: error.message
+    });
+  }
+};
