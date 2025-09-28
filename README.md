@@ -40,6 +40,25 @@ uploads/
 - DOCX (Microsoft Word Open XML)
 - TXT (Plain Text)
 
+## Technologies Used
+
+- Node.js
+- Express.js
+- Multer
+- Path
+- FormData
+- PDF-parse
+- OpenAI
+- LangChain
+- Mongoose
+- Dotenv
+- CORS
+- Nodemon
+- Gemini AI
+- Mistral AI
+- GROQ AI platform
+- LangChain Community
+
 ## � API Endpoints
 
 ### 1. Main Chat Endpoint
@@ -216,22 +235,6 @@ curl http://localhost:5000/
    npm run dev
    ```
 
-4. **Test the functionality:**
-
-   ```bash
-   node test-upload.js
-   ```
-
-## ⚙️ Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-PORT=5000
-FRONTEND_URL=http://localhost:3000
-NODE_ENV=development
-```
-
 ## 🔒 Security Features
 
 - File type validation to prevent malicious uploads
@@ -247,13 +250,6 @@ The system provides detailed error messages for various scenarios:
 - **Unsupported file type**: When file type is not allowed
 - **Too many files**: When file count exceeds limits
 - **Upload errors**: General upload failures with cleanup
-
-## 🛠️ Development Notes
-
-- Files are stored with unique names to prevent conflicts
-- Directory structure is created automatically
-- All file operations include proper error handling
-- Static file serving is configured for easy access to uploads
 
 ## Setup dotenv
 
