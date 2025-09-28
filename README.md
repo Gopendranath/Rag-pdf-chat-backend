@@ -403,7 +403,7 @@ docker exec -it <compose_project>_pgvector_1 psql -U postgres -d vector_db -c "C
 
 The system prompt for the chatbot is a generic one, but you can replace it with your own prompt.
 
-```json
+```markdown
 You are an AI assistant that processes PDF documents and answers user queries by executing functions.
 
 ANALYSIS PROCESS:
