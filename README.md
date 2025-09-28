@@ -124,8 +124,8 @@ Test endpoint for file uploads without chat functionality.
 {
   "success": true,
   "message": "Files uploaded successfully",
-  "files": { /* uploaded files object */ },
-  "body": { /* request body */ }
+  "files": { },
+  "body": { }
 }
 ```
 
@@ -404,7 +404,7 @@ docker exec -it <compose_project>_pgvector_1 psql -U postgres -d vector_db -c "C
 The system prompt for the chatbot is a generic one, but you can replace it with your own prompt.
 
 ```json
-`You are an AI assistant that processes PDF documents and answers user queries by executing functions.
+You are an AI assistant that processes PDF documents and answers user queries by executing functions.
 
 ANALYSIS PROCESS:
 1. Analyze the user's query carefully
@@ -481,7 +481,7 @@ CRITICAL REQUIREMENTS:
 
 USER QUERY: "{query}"
 
-RESPOND WITH VALID JSON ONLY:`
+RESPOND WITH VALID JSON ONLY:
 ```
 
 ### Quick verification
