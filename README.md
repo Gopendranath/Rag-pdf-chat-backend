@@ -255,6 +255,20 @@ The system provides detailed error messages for various scenarios:
 - All file operations include proper error handling
 - Static file serving is configured for easy access to uploads
 
+## Setup dotenv
+
+Create a `.env` file in the root directory:
+
+```env
+MONGODB_URL=mongodb://localhost:27017/ragPdfChat
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/vector_db
+GEMINI_API_KEY=****************************
+MISTRAL_API_KEY=****************************
+MISTRAL_API_URL=https://api.mistral.ai/v1/
+GROQ_API_KEY=****************************
+GROQ_API_URL=https://api.groq.com/openai/v1/
+```
+
 ## 🗄️ Databases: PostgreSQL (pgvector) and MongoDB
 
 This project can use a vector-enabled PostgreSQL (pgvector) for embeddings and MongoDB for document storage. Below are quick Docker commands to run both locally, plus a docker-compose example.
