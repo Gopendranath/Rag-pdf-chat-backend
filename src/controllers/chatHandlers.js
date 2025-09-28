@@ -11,6 +11,7 @@ export const handleStreamingChat = async (req, res) => {
     const { messages, processDocuments = false, processImages = false } = req.body;
     const { processedMessages, organizedFiles, shouldProcessDocuments, shouldProcessImages } = prepareRequestData(messages, req.files, processDocuments, processImages);
     filesToCleanup = collectFilesForCleanup(req.files);
+    // console.log(req.body)
 
     // Check if both document and image files are provided
     if (organizedFiles.documents.length > 0 && organizedFiles.images.length > 0) {

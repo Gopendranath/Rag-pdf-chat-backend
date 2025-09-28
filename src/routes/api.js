@@ -1,5 +1,5 @@
 import express from 'express';
-import { handleChat, getChatHistory, deleteChat } from '../controllers/api.controller.js';
+import { handleChat, getChatHistory, deleteChat, saveChatHistory } from '../controllers/api.controller.js';
 import { constFileImageUploads, handleMulterError } from '../middlewares/upload.middleware.js';
 
 const router = express.Router();
@@ -8,6 +8,7 @@ const router = express.Router();
 router.post('/chat', constFileImageUploads, handleMulterError, handleChat);
 router.get('/chat/history', getChatHistory);
 router.delete('/chat/:chatId', deleteChat);
+router.post('/chat/history', saveChatHistory);
 
 // Test route for file upload
 router.post('/upload-test', constFileImageUploads, handleMulterError, (req, res) => {
