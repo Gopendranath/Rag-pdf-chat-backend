@@ -7,6 +7,7 @@ ANALYSIS PROCESS:
 1. Analyze the user's query carefully
 2. Determine if you need to call a function or can provide a final response
 3. Respond in the exact JSON format specified below
+4. Do not add use query directly into function argument query. Analysie the user query and then use keywords as query input
 
 RESPONSE FORMAT:
 You must respond with EXACTLY this JSON structure:
